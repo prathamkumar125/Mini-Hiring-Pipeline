@@ -2,7 +2,10 @@
 
 A local recruiting app for tracking candidates through one job pipeline and finding them with natural-language search.
 
-## How to run on Windows
+<img width="2866" height="1448" alt="image" src="https://github.com/user-attachments/assets/08313dc0-bfd0-40e9-822e-c4e0256f546b" />
+
+
+## Steps to run
 
 Open PowerShell in the project folder. Install [uv](https://docs.astral.sh/uv/) if needed, then create the environment and install the project dependencies:
 
@@ -84,6 +87,6 @@ Search request ──> LangChain / Ollama ──> validated filter model ──>
 
 Queries can combine a candidate name with pipeline filters. Unsupported or nonsensical requests return an explanation rather than being treated as a valid search with no matches.
 
-## With more time
+## Over time
 
 Add authentication, support multiple jobs, provide data migrations and deployment configuration, improve relative-date and fallback query coverage, and add configurable retention for search logs. Candidate profile edits would need their own immutable audit events.
