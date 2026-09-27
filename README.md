@@ -1,33 +1,89 @@
 # Mini Hiring Pipeline
 
-A local recruiter tool for one job pipeline. FastAPI owns the business rules and SQLite audit data; Streamlit provides the UI. Search uses LangChain + a local Ollama model when available, and a transparent deterministic fallback when it is not.
+A local recruiting app for tracking candidates through one job pipeline and finding them with natural-language search.
 
-## Run it
+## How to run on Windows
 
-1. Install [uv](https://docs.astral.sh/uv/) if needed, create the local environment, and install dependencies into it:
-   ```bash
-   uv venv venv
-   venv\Scripts\activate
-   uv pip install -r requirements.txt
-   ```
-2. Copy `.env.example` to `.env` and adjust configuration if needed. `python-dotenv` loads it automatically without overriding real environment variables.
-3. AI interpretation: install [Ollama](https://ollama.com), start its local service, then pull the configured model (default in `.env.example`: `ollama pull qwen2.5-coder:1.5b`). Keep `OLLAMA_MODEL` set to a model that `ollama list` shows as installed.
-4. Start the API in one terminal: `uv run --active uvicorn app.main:app --reload`
-5. Start the UI in another: `uv run --active streamlit run streamlit_app.py`
-6. Open the URL Streamlit displays (normally `http://localhost:8501`). The API is at `http://127.0.0.1:8000`; set `API_URL` if it differs. Set `DATABASE_PATH` to place the SQLite file elsewhere.
+Open PowerShell in the project folder. Install [uv](https://docs.astral.sh/uv/) if needed, then create the environment and install the project dependencies:
 
-Run checks with `venv\Scripts\python.exe -m pytest`. The API’s interactive documentation is available at `/docs`.
+```powershell
+uv venv venv
+uv pip install --python venv\Scripts\python.exe -r requirements.txt
+```
 
-## Design decisions
+Create the local configuration file and pull the configured Ollama model:
 
-- **Append-only audit trail:** stage is derived from the latest event; events have SQLite triggers that abort updates and deletes. This prevents accidental history rewrites even outside the API.
-- **Server-side state machine:** only the immediate next pipeline stage is valid. Rejection is allowed only from active stages; Hired and Rejected are terminal.
-- **Safe natural-language search:** the model is asked for JSON matching a Pydantic schema, never SQL. The repository builds parameterized queries, and fuzzy ranking is performed in Python.
-- **Graceful model outage:** every query is sent to LangChain/Ollama first. If Ollama is unavailable or returns invalid/unsupported filters, supported phrase patterns and fuzzy name matching continue to work and the UI identifies the fallback.
-- **Local searchable AI log:** every search records its input, interpreted filters, parser source, outcome message, count, and timestamp in SQLite.
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+ollama pull qwen2.5-coder:1.5b
+```
 
-Example searches: `sharam`, `Who's in Interview right now?`, `stuck in Screening for more than a week`, `moved to Interview since Monday`, `reached the Offer stage but didn't get hired`, and `everyone except rejected candidates`.
+The copy command preserves an existing `.env` so it does not replace local settings.
 
-## Improvements
+Ollama must be running locally. The Windows Ollama app normally starts its service; if it is not running, start it with `ollama serve`. Set `OLLAMA_MODEL` in `.env` to another model shown by `ollama list` if desired.
 
-Add authentication and role permissions, multiple jobs and candidate editing with a separate immutable change audit, pagination, richer relative-date parsing, configurable retention/redaction for search logs, background model-health checks, migration tooling, accessibility refinement, and deployment/container configuration.
+Start the API and UI in two separate PowerShell windows, both opened in the project folder:
+
+```powershell
+.\venv\Scripts\uvicorn.exe app.main:app --reload
+```
+
+```powershell
+.\venv\Scripts\streamlit.exe run streamlit_app.py
+```
+
+Open the Streamlit URL printed in its terminal (usually `http://localhost:8501`). FastAPI’s interactive API documentation is at `http://127.0.0.1:8000/docs`.
+
+The default database is `hiring_pipeline.db` in the working directory. Configuration is loaded from `.env` and can be overridden by environment variables:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DATABASE_PATH` | `hiring_pipeline.db` | SQLite database location |
+| `OLLAMA_MODEL` | `llama3.2` | Installed local model used to interpret searches; the supplied `.env.example` selects `qwen2.5-coder:1.5b` |
+| `API_URL` | `http://127.0.0.1:8000` | FastAPI URL used by Streamlit |
+
+Run the automated checks with:
+
+```powershell
+.\venv\Scripts\python.exe -m pytest
+```
+
+## Architecture summary
+
+```text
+Streamlit UI  ──HTTP──>  FastAPI routes  ──>  lifecycle / search services
+                              │                         │
+                              └──── repository ─────────┴──> SQLite
+                                      │
+Search request ──> LangChain / Ollama ──> validated filter model ──> parameterized query
+                                      └──> supported local fallback when AI is unavailable
+```
+
+- `streamlit_app.py` presents the stage board, candidate form and detail history, submitted search results, and stored search logs.
+- `app/main.py` exposes the REST API. `app/lifecycle.py` enforces candidate transitions; `app/search.py` interprets searches; `app/repository.py` reads and writes records; `app/database.py` creates the SQLite schema; and `app/domain.py` defines validated data models.
+- SQLite stores candidate details, append-only stage events, and search logs. Current stage and time in stage are derived from the latest event.
+- Search sends the query through LangChain to the configured Ollama model. The response must validate as a `SearchFilters` model; application code builds parameterized SQL from those filters and never executes model-provided SQL. If the model is unavailable or returns unusable filters, supported deterministic patterns and fuzzy name matching are used and the UI says so.
+
+## Decisions and reasons
+
+- **Append-only stage events:** candidate stage is derived from history, and SQLite triggers reject edits or deletion of recorded events. This preserves the audit trail while keeping the current stage easy to calculate.
+- **Transitions enforced by the API:** a candidate can move only to the next stage or to Rejected from an active stage. Hired and Rejected are final. The write uses a SQLite transaction so simultaneous requests cannot advance the same candidate twice from a stale stage.
+- **Separate UI and API:** Streamlit focuses on recruiter workflows; FastAPI owns rules and persistence. This keeps lifecycle rules consistent for both the UI and direct API clients.
+- **Validated AI filters, not generated SQL:** Qwen translates the question into a small typed filter object. The repository applies those filters with parameterized queries, limiting the model’s authority and keeping execution predictable.
+- **Local fallback and logs:** name matching and documented query patterns remain available if Ollama is down. Each search records its text, parser source, interpretation, result count, message, and timestamp in SQLite so the recruiter can inspect recent AI-assisted searches.
+- **SQLite for v1:** the app is a single-recruiter local tool; SQLite keeps setup lightweight and requires no separate database service.
+
+## Search examples
+
+- `sharam` — fuzzy name match for Priya Sharma.
+- `Who's in Interview right now?`
+- `stuck in Screening for more than a week`
+- `moved to Interview since Monday`
+- `reached the Offer stage but didn't get hired`
+- `everyone except rejected candidates`
+
+Queries can combine a candidate name with pipeline filters. Unsupported or nonsensical requests return an explanation rather than being treated as a valid search with no matches.
+
+## With more time
+
+Add authentication, support multiple jobs, provide data migrations and deployment configuration, improve relative-date and fallback query coverage, and add configurable retention for search logs. Candidate profile edits would need their own immutable audit events.
