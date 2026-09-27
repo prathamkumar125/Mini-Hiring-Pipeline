@@ -28,6 +28,6 @@ Run checks with `venv\Scripts\python.exe -m pytest`. The API’s interactive doc
 
 Example searches: `sharam`, `Who's in Interview right now?`, `stuck in Screening for more than a week`, `moved to Interview since Monday`, `reached the Offer stage but didn't get hired`, and `everyone except rejected candidates`.
 
-## With more time
+## Improvements
 
 Add authentication and role permissions, multiple jobs and candidate editing with a separate immutable change audit, pagination, richer relative-date parsing, configurable retention/redaction for search logs, background model-health checks, migration tooling, accessibility refinement, and deployment/container configuration.
