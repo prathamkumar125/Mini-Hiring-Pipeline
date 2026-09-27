@@ -12,8 +12,8 @@ A local recruiter tool for one job pipeline. FastAPI owns the business rules and
    ```
 2. Copy `.env.example` to `.env` and adjust configuration if needed. `python-dotenv` loads it automatically without overriding real environment variables.
 3. AI interpretation: install [Ollama](https://ollama.com), start its local service, then pull the configured model (default in `.env.example`: `ollama pull qwen2.5-coder:1.5b`). Keep `OLLAMA_MODEL` set to a model that `ollama list` shows as installed.
-4. Start the API in one terminal: `venv\Scripts\uvicorn.exe app.main:app --reload`
-5. Start the UI in another: `venv\Scripts\streamlit.exe run streamlit_app.py`
+4. Start the API in one terminal: `uv run --active uvicorn app.main:app --reload`
+5. Start the UI in another: `uv run --active streamlit run streamlit_app.py`
 6. Open the URL Streamlit displays (normally `http://localhost:8501`). The API is at `http://127.0.0.1:8000`; set `API_URL` if it differs. Set `DATABASE_PATH` to place the SQLite file elsewhere.
 
 Run checks with `venv\Scripts\python.exe -m pytest`. The API’s interactive documentation is available at `/docs`.
